@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Post {
+  id          String   @id @default(cuid())
+  content     String
+  status      String   @default("draft") // draft, scheduled, published
+  hashtags    String   @default("") // comma-separated
+  score       Int?     // 0-100 AI score
+  scoreFeedback String? // AI feedback on the post
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Series relation
+  seriesId    String?
+  seriesOrder Int      @default(0)
+  series      Series?  @relation(fields: [seriesId], references: [id])
+
+  // Template used
+  templateId  String?
+  template    Template? @relation(fields: [templateId], references: [id])
+
+  // Analytics
+  analytics   PostAnalytics?
+
+  // Recycled from
+  recycledFromId String?
+}
+
+model Template {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  structure   String   // The template prompt/structure
+  category    String   @default("general") // storytelling, tips, hot-take, carousel, etc.
+  createdAt   DateTime @default(now())
+  posts       Post[]
+}
+
+model Series {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  posts       Post[]
+}
+
+model Idea {
+  id          String   @id @default(cuid())
+  content     String
+  tags        String   @default("") // comma-separated
+  status      String   @default("fresh") // fresh, developing, used
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PostAnalytics {
+  id          String   @id @default(cuid())
+  postId      String   @unique
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  likes       Int      @default(0)
+  comments    Int      @default(0)
+  reposts     Int      @default(0)
+  impressions Int      @default(0)
+  updatedAt   DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  message   String
+  type      String   @default("info") // info, success, error
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
