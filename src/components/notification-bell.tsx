@@ -16,19 +16,27 @@ export function NotificationBell() {
 
   const unread = notifications.filter((n) => !n.read).length;
 
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  async function fetchNotifications() {
+  const fetchNotifications = async () => {
     try {
       const res = await fetch("/api/notifications");
       const data = await res.json();
       setNotifications(data);
     } catch {}
-  }
+  };
+
+  useEffect(() => {
+    const initialLoad = setTimeout(() => {
+      void fetchNotifications();
+    }, 0);
+    const interval = setInterval(() => {
+      void fetchNotifications();
+    }, 30000);
+
+    return () => {
+      clearTimeout(initialLoad);
+      clearInterval(interval);
+    };
+  }, []);
 
   async function markAllRead() {
     await fetch("/api/notifications", { method: "PUT" });

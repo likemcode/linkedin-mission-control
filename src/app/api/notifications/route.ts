@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +10,7 @@ export async function GET() {
   return Response.json(notifications);
 }
 
-export async function PUT(request: NextRequest) {
+export async function PUT() {
   // Mark all as read
   await prisma.notification.updateMany({
     where: { read: false },

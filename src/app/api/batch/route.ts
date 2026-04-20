@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { generateContent } from "@/lib/claude";
+import { generateContent } from "@/lib/llm";
 import { prisma } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
