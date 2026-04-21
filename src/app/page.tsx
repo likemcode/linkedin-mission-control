@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { PostCard } from "@/components/post-card";
-import { DeleteButton } from "@/components/delete-button";
+import { DashboardClient } from "@/components/dashboard-client";
+import { OnboardingWizard } from "@/components/onboarding-wizard";
 
 export const dynamic = "force-dynamic";
 
@@ -14,52 +13,77 @@ export default async function Dashboard() {
   const scheduled = posts.filter((p) => p.status === "scheduled");
   const published = posts.filter((p) => p.status === "published");
 
+  const scoredPosts = posts.filter((p) => p.score !== null);
+  const avgScore = scoredPosts.length > 0
+    ? Math.round(scoredPosts.reduce((sum, p) => sum + (p.score ?? 0), 0) / scoredPosts.length)
+    : 0;
+
+  // Weekly activity sparkline data (last 7 days)
+  const now = new Date();
+  const sparkline: number[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const day = new Date(now);
+    day.setDate(day.getDate() - i);
+    const dayStart = new Date(day);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(day);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    sparkline.push(
+      posts.filter((p) => {
+        const d = new Date(p.createdAt);
+        return d >= dayStart && d <= dayEnd;
+      }).length
+    );
+  }
+
+  // Score change this week vs last week
+  const weekAgo = new Date(now);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const thisWeekScored = scoredPosts.filter((p) => {
+    const d = p.publishedAt ? new Date(p.publishedAt) : new Date(p.createdAt);
+    return d >= weekAgo;
+  });
+  const lastWeekScored = scoredPosts.filter((p) => {
+    const d = p.publishedAt ? new Date(p.publishedAt) : new Date(p.createdAt);
+    const twoWeeksAgo = new Date(weekAgo);
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 7);
+    return d >= twoWeeksAgo && d < weekAgo;
+  });
+  const thisWeekAvg = thisWeekScored.length > 0
+    ? Math.round(thisWeekScored.reduce((sum, p) => sum + (p.score ?? 0), 0) / thisWeekScored.length)
+    : 0;
+  const lastWeekAvg = lastWeekScored.length > 0
+    ? Math.round(lastWeekScored.reduce((sum, p) => sum + (p.score ?? 0), 0) / lastWeekScored.length)
+    : 0;
+  const scoreChange = thisWeekAvg && lastWeekAvg ? thisWeekAvg - lastWeekAvg : 0;
+
+  const recentDrafts = drafts.slice(0, 4);
+  const upcomingScheduled = scheduled
+    .filter((p) => p.scheduledAt && new Date(p.scheduledAt) > new Date())
+    .sort((a, b) => new Date(a.scheduledAt!).getTime() - new Date(b.scheduledAt!).getTime())
+    .slice(0, 5);
+
+  // Analytics summary
+  const allAnalytics = await prisma.postAnalytics.findMany({
+    include: { post: { select: { id: true, content: true, score: true, publishedAt: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Link
-          href="/editor"
-          className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          + Nouveau post
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-          <div className="text-3xl font-bold text-yellow-400">{drafts.length}</div>
-          <div className="text-sm text-gray-400">Brouillons</div>
-        </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-          <div className="text-3xl font-bold text-blue-400">{scheduled.length}</div>
-          <div className="text-sm text-gray-400">Planifiés</div>
-        </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-          <div className="text-3xl font-bold text-green-400">{published.length}</div>
-          <div className="text-sm text-gray-400">Publiés</div>
-        </div>
-      </div>
-
-      {posts.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
-          <p className="text-lg mb-2">Aucun post pour le moment</p>
-          <Link href="/editor" className="text-blue-400 hover:underline">
-            Crée ton premier post
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {posts.map((post) => (
-            <div key={post.id} className="flex items-start gap-2">
-              <Link href={`/editor/${post.id}`} className="flex-1">
-                <PostCard post={post} />
-              </Link>
-              <DeleteButton postId={post.id} />
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <>
+      <OnboardingWizard />
+      <DashboardClient
+      drafts={drafts}
+      scheduled={scheduled}
+      published={published}
+      avgScore={avgScore}
+      recentDrafts={recentDrafts}
+      upcomingScheduled={upcomingScheduled}
+      sparkline={sparkline}
+      scoreChange={scoreChange}
+      allAnalytics={JSON.parse(JSON.stringify(allAnalytics))}
+    />
+    </>
   );
 }
