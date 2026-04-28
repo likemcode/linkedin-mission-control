@@ -34,6 +34,47 @@ type ScoreResult = {
   hashtags: string[];
 };
 
+type AssistantStatus =
+  | { type: "idle" }
+  | { type: "info"; message: string }
+  | { type: "loading"; title: string; message: string }
+  | { type: "success"; message: string }
+  | { type: "error"; message: string };
+
+function AssistantStatusPanel({ status }: { status: AssistantStatus }) {
+  if (status.type === "idle") return null;
+
+  const styles = {
+    info: "border-blue-900/70 bg-blue-950/30 text-blue-200",
+    loading: "border-purple-900/70 bg-purple-950/30 text-purple-200",
+    success: "border-green-900/70 bg-green-950/30 text-green-200",
+    error: "border-red-900/70 bg-red-950/30 text-red-200",
+  }[status.type];
+
+  return (
+    <div className={`rounded-lg border px-3 py-2 text-sm ${styles}`}>
+      <div className="flex items-start gap-2">
+        {status.type === "loading" && (
+          <span className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-purple-300 border-t-transparent" />
+        )}
+        {status.type === "success" && <span className="mt-0.5 shrink-0 text-green-300">✓</span>}
+        {status.type === "error" && <span className="mt-0.5 shrink-0 text-red-300">!</span>}
+        {status.type === "info" && <span className="mt-0.5 shrink-0 text-blue-300">i</span>}
+        <div>
+          {status.type === "loading" ? (
+            <>
+              <div className="font-medium">{status.title}</div>
+              <div className="text-xs opacity-80">{status.message}</div>
+            </>
+          ) : (
+            <div>{status.message}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PostEditor({ post }: { post?: Post }) {
   const router = useRouter();
   const [content, setContent] = useState(post?.content ?? "");
@@ -53,6 +94,8 @@ export function PostEditor({ post }: { post?: Post }) {
     post?.score ? { score: post.score, feedback: post.scoreFeedback ?? "", hashtags: post.hashtags?.split(",").filter(Boolean) ?? [] } : null
   );
   const [recycling, setRecycling] = useState(false);
+  const [assistantStatus, setAssistantStatus] = useState<AssistantStatus>({ type: "idle" });
+  const [previousContent, setPreviousContent] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(apiPath("/api/templates")).then((r) => r.json()).then(setTemplates);
@@ -60,8 +103,30 @@ export function PostEditor({ post }: { post?: Post }) {
   }, []);
 
   async function handleGenerate() {
-    if (!prompt && !content) return;
+    const trimmedPrompt = prompt.trim();
+    const trimmedContent = content.trim();
+    const isImproving = Boolean(trimmedContent);
+
+    if (!trimmedPrompt && !isImproving) {
+      setAssistantStatus({ type: "info", message: "Décris le sujet du post pour lancer la génération." });
+      return;
+    }
+
+    if (isImproving) setPreviousContent(content);
     setGenerating(true);
+    setAssistantStatus(
+      isImproving
+        ? {
+            type: "loading",
+            title: "Amélioration en cours...",
+            message: "Friend retravaille ton post sans supprimer ton brouillon original.",
+          }
+        : {
+            type: "loading",
+            title: "Génération en cours...",
+            message: "Friend prépare ton post LinkedIn. Ça peut prendre quelques secondes selon le modèle IA.",
+          }
+    );
     try {
       const selectedTemplate = templates.find((t) => t.id === templateId);
       const templateInstruction = selectedTemplate
@@ -72,21 +137,44 @@ export function PostEditor({ post }: { post?: Post }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: (prompt || "Améliore ce post") + templateInstruction,
+          prompt: (trimmedPrompt || "Améliore ce post") + templateInstruction,
           existingContent: content || undefined,
         }),
       });
       const data = await res.json();
-      if (data.content) setContent(data.content);
-      if (data.error) alert(data.error);
+      if (data.error) {
+        setAssistantStatus({ type: "error", message: data.error });
+        return;
+      }
+      if (data.content) {
+        setContent(data.content);
+        setAssistantStatus({
+          type: "success",
+          message: isImproving
+            ? "Post amélioré. Tu peux annuler si tu préfères l'ancienne version."
+            : "Post généré. Relis, ajuste puis score-le.",
+        });
+      } else {
+        setAssistantStatus({ type: "error", message: "La génération n'a pas retourné de contenu. Réessaie dans quelques secondes." });
+      }
+    } catch {
+      setAssistantStatus({ type: "error", message: "La génération a échoué. Vérifie le modèle IA ou réessaie dans quelques secondes." });
     } finally {
       setGenerating(false);
     }
   }
 
   async function handleScore() {
-    if (!content) return;
+    if (!content.trim()) {
+      setAssistantStatus({ type: "info", message: "Écris ou génère un post avant de demander un score." });
+      return;
+    }
     setScoring(true);
+    setAssistantStatus({
+      type: "loading",
+      title: "Analyse en cours...",
+      message: "Analyse du hook, de la clarté, de la structure et du potentiel d'engagement.",
+    });
     try {
       const res = await fetch(apiPath("/api/score"), {
         method: "POST",
@@ -95,13 +183,23 @@ export function PostEditor({ post }: { post?: Post }) {
       });
       const data = await res.json();
       if (data.error) {
-        alert(data.error);
+        setAssistantStatus({ type: "error", message: data.error });
       } else {
         setScoreResult(data);
+        setAssistantStatus({ type: "success", message: "Score prêt. Utilise le feedback pour améliorer ton post." });
       }
+    } catch {
+      setAssistantStatus({ type: "error", message: "L'analyse du post a échoué. Réessaie dans quelques secondes." });
     } finally {
       setScoring(false);
     }
+  }
+
+  function handleUndoImprove() {
+    if (previousContent === null) return;
+    setContent(previousContent);
+    setPreviousContent(null);
+    setAssistantStatus({ type: "info", message: "Version précédente restaurée." });
   }
 
   async function handleRecycle() {
@@ -211,6 +309,14 @@ export function PostEditor({ post }: { post?: Post }) {
   const charCount = content.length;
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const readTime = Math.max(1, Math.ceil(wordCount / 200));
+  const hasContent = Boolean(content.trim());
+  const hasPrompt = Boolean(prompt.trim());
+  const isAssistantBusy = generating || scoring || recycling;
+  const assistantHelp = !hasContent && !hasPrompt
+    ? "Décris le sujet du post pour lancer la génération."
+    : hasContent && !hasPrompt
+      ? "Ajoute une instruction ou clique Améliorer pour une amélioration générale."
+      : "Prêt à lancer l'assistant IA.";
 
   return (
     <div className="grid grid-cols-2 gap-6">
@@ -242,6 +348,7 @@ export function PostEditor({ post }: { post?: Post }) {
           <select
             value={templateId}
             onChange={(e) => setTemplateId(e.target.value)}
+            disabled={isAssistantBusy}
             className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-600"
           >
             <option value="">Aucun template — style libre</option>
@@ -257,37 +364,56 @@ export function PostEditor({ post }: { post?: Post }) {
               type="text"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
-              placeholder={content ? "Instructions pour améliorer..." : "Sujet du post à générer..."}
+              onKeyDown={(e) => e.key === "Enter" && !isAssistantBusy && handleGenerate()}
+              disabled={isAssistantBusy}
+              placeholder={hasContent ? "Instructions pour améliorer..." : "Sujet du post à générer..."}
               className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-600"
             />
             <button
               onClick={handleGenerate}
-              disabled={generating || (!prompt && !content)}
-              className="bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-500 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
+              disabled={isAssistantBusy || (!hasPrompt && !hasContent)}
+              className="min-w-36 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-500 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
             >
-              {generating ? "..." : content ? "Améliorer" : "Générer"}
+              {generating ? (hasContent ? "Amélioration en cours..." : "Génération en cours...") : hasContent ? "Améliorer" : "Générer un post"}
             </button>
           </div>
+
+          <p className="text-xs text-gray-500">{assistantHelp}</p>
+
+          <AssistantStatusPanel status={assistantStatus} />
+
+          {previousContent !== null && !generating && (
+            <button
+              type="button"
+              onClick={handleUndoImprove}
+              className="text-xs text-purple-300 hover:text-purple-200 underline underline-offset-4"
+            >
+              Annuler l&apos;amélioration
+            </button>
+          )}
 
           <div className="flex gap-2">
             <button
               onClick={handleScore}
-              disabled={scoring || !content}
+              disabled={isAssistantBusy || !hasContent}
               className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-700 disabled:text-gray-500 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors"
             >
-              {scoring ? "Analyse..." : "Scorer ce post"}
+              {scoring ? "Analyse en cours..." : "Scorer ce post"}
             </button>
             {post && (
               <button
                 onClick={handleRecycle}
-                disabled={recycling || !content}
+                disabled={isAssistantBusy || !hasContent}
                 className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 disabled:text-gray-500 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors"
               >
                 {recycling ? "Recyclage..." : "Recycler sous un nouvel angle"}
               </button>
             )}
           </div>
+
+          {!hasContent && (
+            <p className="text-xs text-gray-600">Écris ou génère un post avant de demander un score.</p>
+          )}
         </div>
 
         {/* Score result */}
