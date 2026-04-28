@@ -34,6 +34,11 @@ type ScoreResult = {
   hashtags: string[];
 };
 
+type ImproveOptions = {
+  instructionOverride?: string;
+  successMessage?: string;
+};
+
 type AssistantStatus =
   | { type: "idle" }
   | { type: "info"; message: string }
@@ -102,12 +107,13 @@ export function PostEditor({ post }: { post?: Post }) {
     fetch(apiPath("/api/series")).then((r) => r.json()).then(setSeriesList);
   }, []);
 
-  async function handleGenerate() {
+  async function runGenerate(options: ImproveOptions = {}) {
     const trimmedPrompt = prompt.trim();
     const trimmedContent = content.trim();
     const isImproving = Boolean(trimmedContent);
+    const instruction = options.instructionOverride?.trim() || trimmedPrompt;
 
-    if (!trimmedPrompt && !isImproving) {
+    if (!instruction && !isImproving) {
       setAssistantStatus({ type: "info", message: "Décris le sujet du post pour lancer la génération." });
       return;
     }
@@ -137,7 +143,7 @@ export function PostEditor({ post }: { post?: Post }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: (trimmedPrompt || "Améliore ce post") + templateInstruction,
+          prompt: (instruction || "Améliore ce post") + templateInstruction,
           existingContent: content || undefined,
         }),
       });
@@ -150,9 +156,9 @@ export function PostEditor({ post }: { post?: Post }) {
         setContent(data.content);
         setAssistantStatus({
           type: "success",
-          message: isImproving
+          message: options.successMessage ?? (isImproving
             ? "Post amélioré. Tu peux annuler si tu préfères l'ancienne version."
-            : "Post généré. Relis, ajuste puis score-le.",
+            : "Post généré. Relis, ajuste puis score-le."),
         });
       } else {
         setAssistantStatus({ type: "error", message: "La génération n'a pas retourné de contenu. Réessaie dans quelques secondes." });
@@ -162,6 +168,18 @@ export function PostEditor({ post }: { post?: Post }) {
     } finally {
       setGenerating(false);
     }
+  }
+
+  async function handleGenerate() {
+    await runGenerate();
+  }
+
+  async function handleImproveWithFeedback() {
+    if (!scoreResult || !content.trim()) return;
+    await runGenerate({
+      instructionOverride: `Améliore ce post LinkedIn en appliquant ce feedback: ${scoreResult.feedback}`,
+      successMessage: "Post amélioré avec le feedback du score. Tu peux annuler si tu préfères l'ancienne version.",
+    });
   }
 
   async function handleScore() {
@@ -317,6 +335,13 @@ export function PostEditor({ post }: { post?: Post }) {
     : hasContent && !hasPrompt
       ? "Ajoute une instruction ou clique Améliorer pour une amélioration générale."
       : "Prêt à lancer l'assistant IA.";
+  const scoreVerdict = scoreResult
+    ? scoreResult.score >= 80
+      ? { label: "Très bon potentiel", className: "text-green-300 bg-green-950/40 border-green-900/70" }
+      : scoreResult.score >= 60
+        ? { label: "À renforcer", className: "text-yellow-300 bg-yellow-950/40 border-yellow-900/70" }
+        : { label: "À retravailler", className: "text-red-300 bg-red-950/40 border-red-900/70" }
+    : null;
 
   return (
     <div className="grid grid-cols-2 gap-6">
@@ -419,21 +444,45 @@ export function PostEditor({ post }: { post?: Post }) {
         {/* Score result */}
         {scoreResult && (
           <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-sm text-gray-400">Score:</span>
-              <span
-                className={`text-2xl font-bold ${
-                  scoreResult.score >= 80
-                    ? "text-green-400"
-                    : scoreResult.score >= 60
-                      ? "text-yellow-400"
-                      : "text-red-400"
-                }`}
-              >
-                {scoreResult.score}/100
-              </span>
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div>
+                <span className="text-sm text-gray-400">Score IA</span>
+                <div
+                  className={`text-3xl font-bold ${
+                    scoreResult.score >= 80
+                      ? "text-green-400"
+                      : scoreResult.score >= 60
+                        ? "text-yellow-400"
+                        : "text-red-400"
+                  }`}
+                >
+                  {scoreResult.score}/100
+                </div>
+              </div>
+              {scoreVerdict && (
+                <span className={`rounded-full border px-3 py-1 text-xs font-medium ${scoreVerdict.className}`}>
+                  {scoreVerdict.label}
+                </span>
+              )}
             </div>
-            <p className="text-sm text-gray-300 mb-2">{scoreResult.feedback}</p>
+
+            <p className="text-sm text-gray-300 mb-4">{scoreResult.feedback}</p>
+
+            <div className="grid grid-cols-2 gap-2 mb-4 text-xs text-gray-400">
+              <div className="rounded border border-gray-800 bg-gray-950/50 p-2">
+                <span className="font-medium text-gray-200">Hook</span> — la première ligne donne envie de lire.
+              </div>
+              <div className="rounded border border-gray-800 bg-gray-950/50 p-2">
+                <span className="font-medium text-gray-200">Clarté</span> — une idée principale, pas trop de dispersion.
+              </div>
+              <div className="rounded border border-gray-800 bg-gray-950/50 p-2">
+                <span className="font-medium text-gray-200">Structure</span> — paragraphes courts et scannables.
+              </div>
+              <div className="rounded border border-gray-800 bg-gray-950/50 p-2">
+                <span className="font-medium text-gray-200">CTA</span> — une question ou prochaine action claire.
+              </div>
+            </div>
+
             {scoreResult.hashtags.length > 0 && (
               <div className="flex gap-2 flex-wrap">
                 {scoreResult.hashtags.map((h) => (
@@ -449,6 +498,15 @@ export function PostEditor({ post }: { post?: Post }) {
                 ))}
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={handleImproveWithFeedback}
+              disabled={isAssistantBusy || !hasContent}
+              className="mt-4 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-500 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
+            >
+              Améliorer avec ce feedback
+            </button>
           </div>
         )}
 

@@ -317,3 +317,46 @@ Le panneau doit être compact et ne pas pousser excessivement le layout.
 8. Modifier prompt d'amélioration; cliquer améliorer; vérifier loading + success.
 9. Cliquer `Annuler l'amélioration`; vérifier restauration.
 10. Exécuter `npm run lint` et `npm run build`.
+
+## 12. Spécification détaillée Phase 2 — scoring actionnable
+
+### 12.1 Objectif
+
+Transformer le score IA en outil de décision/action. L'utilisateur ne doit pas seulement lire une note; il doit savoir quoi corriger et pouvoir relancer une amélioration basée sur ce feedback.
+
+### 12.2 Carte de score cible
+
+La carte score doit afficher:
+
+- Score global `/100` avec couleur:
+  - >= 80: vert, `Très bon potentiel`
+  - 60–79: jaune, `À renforcer`
+  - < 60: rouge, `À retravailler`
+- Feedback IA.
+- Checklist éditoriale statique pour guider la relecture:
+  - `Hook`: la première ligne donne envie de lire.
+  - `Clarté`: une idée principale, pas trop de dispersion.
+  - `Structure`: paragraphes courts et scannables.
+  - `CTA`: une question ou prochaine action claire.
+- Hashtags cliquables à ajouter au post.
+- Bouton principal: `Améliorer avec ce feedback`.
+
+### 12.3 Améliorer avec le feedback
+
+Au clic:
+
+- Remplir/compléter l'instruction IA avec le feedback du score.
+- Sauvegarder `previousContent` pour permettre undo.
+- Relancer `/api/generate` en mode amélioration avec:
+  - contenu actuel;
+  - instruction: `Améliore ce post LinkedIn en appliquant ce feedback: ...`.
+- Afficher les mêmes états que l'amélioration Phase 1.
+
+### 12.4 Critères d'acceptation Phase 2
+
+- Après scoring, la carte affiche un verdict lisible selon la note.
+- La checklist éditoriale est visible.
+- Les hashtags restent cliquables.
+- Le bouton `Améliorer avec ce feedback` lance une amélioration IA.
+- L'undo reste disponible après cette amélioration.
+- `npm run lint` et `npm run build` passent.
