@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { apiPath } from "@/lib/routes";
 
 type Post = {
   id: string;
@@ -54,8 +55,8 @@ export function PostEditor({ post }: { post?: Post }) {
   const [recycling, setRecycling] = useState(false);
 
   useEffect(() => {
-    fetch("/api/templates").then((r) => r.json()).then(setTemplates);
-    fetch("/api/series").then((r) => r.json()).then(setSeriesList);
+    fetch(apiPath("/api/templates")).then((r) => r.json()).then(setTemplates);
+    fetch(apiPath("/api/series")).then((r) => r.json()).then(setSeriesList);
   }, []);
 
   async function handleGenerate() {
@@ -67,7 +68,7 @@ export function PostEditor({ post }: { post?: Post }) {
         ? `\n\nUtilise cette structure:\n${selectedTemplate.structure}`
         : "";
 
-      const res = await fetch("/api/generate", {
+      const res = await fetch(apiPath("/api/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -87,7 +88,7 @@ export function PostEditor({ post }: { post?: Post }) {
     if (!content) return;
     setScoring(true);
     try {
-      const res = await fetch("/api/score", {
+      const res = await fetch(apiPath("/api/score"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, postId: post?.id }),
@@ -107,7 +108,7 @@ export function PostEditor({ post }: { post?: Post }) {
     if (!post) return;
     setRecycling(true);
     try {
-      const res = await fetch("/api/recycle", {
+      const res = await fetch(apiPath("/api/recycle"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postId: post.id, angle: prompt || undefined }),
@@ -134,13 +135,13 @@ export function PostEditor({ post }: { post?: Post }) {
       };
 
       if (post) {
-        await fetch(`/api/posts/${post.id}`, {
+        await fetch(apiPath(`/api/posts/${post.id}`), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
       } else {
-        await fetch("/api/posts", {
+        await fetch(apiPath("/api/posts"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -157,14 +158,14 @@ export function PostEditor({ post }: { post?: Post }) {
     if (!post) {
       setSaving(true);
       try {
-        const res = await fetch("/api/posts", {
+        const res = await fetch(apiPath("/api/posts"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content, status: "draft" }),
         });
         const newPost = await res.json();
         setPublishing(true);
-        const pubRes = await fetch("/api/publish", {
+        const pubRes = await fetch(apiPath("/api/publish"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ postId: newPost.id }),
@@ -185,12 +186,12 @@ export function PostEditor({ post }: { post?: Post }) {
 
     setPublishing(true);
     try {
-      await fetch(`/api/posts/${post.id}`, {
+      await fetch(apiPath(`/api/posts/${post.id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, status: post.status }),
       });
-      const res = await fetch("/api/publish", {
+      const res = await fetch(apiPath("/api/publish"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postId: post.id }),

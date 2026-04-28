@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiPath } from "@/lib/routes";
 
 type Template = {
   id: string;
@@ -20,7 +21,7 @@ export default function BatchPage() {
   const [result, setResult] = useState<{ count: number; posts: { id: string; content: string }[] } | null>(null);
 
   useEffect(() => {
-    fetch("/api/templates").then((r) => r.json()).then(setTemplates);
+    fetch(apiPath("/api/templates")).then((r) => r.json()).then(setTemplates);
   }, []);
 
   async function handleGenerate() {
@@ -28,7 +29,7 @@ export default function BatchPage() {
     setGenerating(true);
     setResult(null);
     try {
-      const res = await fetch("/api/batch", {
+      const res = await fetch(apiPath("/api/batch"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

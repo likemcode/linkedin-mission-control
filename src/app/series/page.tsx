@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { apiPath } from "@/lib/routes";
 
 type Series = {
   id: string;
@@ -16,12 +17,12 @@ export default function SeriesPage() {
   const [newDesc, setNewDesc] = useState("");
 
   useEffect(() => {
-    fetch("/api/series").then((r) => r.json()).then(setSeriesList);
+    fetch(apiPath("/api/series")).then((r) => r.json()).then(setSeriesList);
   }, []);
 
   async function createSeries() {
     if (!newName.trim()) return;
-    const res = await fetch("/api/series", {
+    const res = await fetch(apiPath("/api/series"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newName, description: newDesc }),
@@ -33,7 +34,7 @@ export default function SeriesPage() {
   }
 
   async function deleteSeries(id: string) {
-    await fetch(`/api/series/${id}`, { method: "DELETE" });
+    await fetch(apiPath(`/api/series/${id}`), { method: "DELETE" });
     setSeriesList(seriesList.filter((s) => s.id !== id));
   }
 

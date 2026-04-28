@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiPath } from "@/lib/routes";
 
 type Template = {
   id: string;
@@ -26,7 +27,7 @@ export default function TemplatesPage() {
   const [selected, setSelected] = useState<Template | null>(null);
 
   useEffect(() => {
-    fetch("/api/templates").then((r) => r.json()).then(setTemplates);
+    fetch(apiPath("/api/templates")).then((r) => r.json()).then(setTemplates);
   }, []);
 
   return (

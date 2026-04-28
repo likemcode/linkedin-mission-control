@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiPath } from "@/lib/routes";
 
 type Notification = {
   id: string;
@@ -18,7 +19,7 @@ export function NotificationBell() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch("/api/notifications");
+      const res = await fetch(apiPath("/api/notifications"));
       const data = await res.json();
       setNotifications(data);
     } catch {}
@@ -39,7 +40,7 @@ export function NotificationBell() {
   }, []);
 
   async function markAllRead() {
-    await fetch("/api/notifications", { method: "PUT" });
+    await fetch(apiPath("/api/notifications"), { method: "PUT" });
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }
 

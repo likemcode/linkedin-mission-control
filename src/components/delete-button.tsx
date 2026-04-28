@@ -2,13 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { apiPath } from "@/lib/routes";
 
 export function DeleteButton({ postId }: { postId: string }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
 
   async function handleDelete() {
-    await fetch(`/api/posts/${postId}`, { method: "DELETE" });
+    await fetch(apiPath(`/api/posts/${postId}`), { method: "DELETE" });
     router.refresh();
   }
 

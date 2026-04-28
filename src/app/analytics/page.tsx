@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { apiPath } from "@/lib/routes";
 
 type PostWithAnalytics = {
   id: string;
@@ -29,7 +30,7 @@ export default function AnalyticsPage() {
   const [posts, setPosts] = useState<PostWithAnalytics[]>([]);
 
   useEffect(() => {
-    fetch("/api/analytics")
+    fetch(apiPath("/api/analytics"))
       .then((r) => r.json())
       .then((data) => {
         setSummary(data.summary);

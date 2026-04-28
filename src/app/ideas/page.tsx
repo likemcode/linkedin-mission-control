@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiPath } from "@/lib/routes";
 
 type Idea = {
   id: string;
@@ -24,12 +25,12 @@ export default function IdeasPage() {
   const [newTags, setNewTags] = useState("");
 
   useEffect(() => {
-    fetch("/api/ideas").then((r) => r.json()).then(setIdeas);
+    fetch(apiPath("/api/ideas")).then((r) => r.json()).then(setIdeas);
   }, []);
 
   async function addIdea() {
     if (!newIdea.trim()) return;
-    const res = await fetch("/api/ideas", {
+    const res = await fetch(apiPath("/api/ideas"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: newIdea, tags: newTags }),
@@ -41,18 +42,18 @@ export default function IdeasPage() {
   }
 
   async function deleteIdea(id: string) {
-    await fetch(`/api/ideas/${id}`, { method: "DELETE" });
+    await fetch(apiPath(`/api/ideas/${id}`), { method: "DELETE" });
     setIdeas(ideas.filter((i) => i.id !== id));
   }
 
   async function transformToPost(idea: Idea) {
-    await fetch(`/api/ideas/${idea.id}`, {
+    await fetch(apiPath(`/api/ideas/${idea.id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...idea, status: "used" }),
     });
     // Create a new post draft and redirect to editor
-    const res = await fetch("/api/posts", {
+    const res = await fetch(apiPath("/api/posts"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: idea.content, status: "draft" }),
@@ -62,7 +63,7 @@ export default function IdeasPage() {
   }
 
   async function updateStatus(idea: Idea, status: string) {
-    const res = await fetch(`/api/ideas/${idea.id}`, {
+    const res = await fetch(apiPath(`/api/ideas/${idea.id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...idea, status }),
