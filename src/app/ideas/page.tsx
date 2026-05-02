@@ -31,7 +31,7 @@ type Idea = {
 const COLUMNS = [
   { key: "fresh", label: "Nouvelles", icon: Lightbulb, color: "var(--color-success)", bg: "var(--color-success-muted)" },
   { key: "developing", label: "En cours", icon: Brain, color: "var(--color-warning)", bg: "var(--color-warning-muted)" },
-  { key: "used", label: "Utilisées", icon: Sparkles, color: "var(--color-text-muted)", bg: "rgba(255,255,255,0.05)" },
+  { key: "used", label: "Utilisées", icon: Sparkles, color: "var(--color-text-muted)", bg: "rgba(0,0,0,0.05)" },
 ] as const;
 
 export default function IdeasPage() {
@@ -114,10 +114,16 @@ export default function IdeasPage() {
     if (!genTheme.trim()) return toast("warning", "Entre une thématique");
     setGenerating(true);
     try {
+      const llmConfig = JSON.parse(localStorage.getItem("mc_llm_config") || "{}");
       const res = await fetch(apiPath("/api/ideas/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ theme: genTheme }),
+        body: JSON.stringify({
+          theme: genTheme,
+          provider: llmConfig.provider,
+          apiKey: llmConfig.apiKey,
+          model: llmConfig.model,
+        }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -279,7 +285,7 @@ export default function IdeasPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             {idea.tags &&
                               idea.tags.split(",").filter(Boolean).map((tag) => (
-                                <span key={tag} className="text-xs bg-[rgba(255,255,255,0.05)] text-[var(--color-text-muted)] px-2 py-0.5 rounded-full border border-[var(--color-border-subtle)]">
+                                <span key={tag} className="text-xs bg-[rgba(0,0,0,0.05)] text-[var(--color-text-muted)] px-2 py-0.5 rounded-full border border-[var(--color-border-subtle)]">
                                   {tag.trim()}
                                 </span>
                               ))}

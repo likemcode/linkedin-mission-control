@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { generateContent } from "@/lib/llm";
+import { generateViaProvider, type ProviderConfig } from "@/lib/llm-providers";
 
 export async function POST(request: NextRequest) {
-  const { prompt, existingContent } = await request.json();
+  const { prompt, existingContent, provider: providerOverride, apiKey, model } = await request.json();
 
   let fullPrompt: string;
 
@@ -12,9 +12,16 @@ export async function POST(request: NextRequest) {
     fullPrompt = `Tu es un expert en copywriting LinkedIn. Écris un post LinkedIn sur le sujet suivant. Le post doit être engageant, authentique et optimisé pour LinkedIn. Utilise des sauts de ligne pour aérer. Réponds uniquement avec le post, sans explication ni commentaire.\n\nSujet: ${prompt}`;
   }
 
+  // Build provider config — default to Ollama if nothing specified
+  const config: ProviderConfig = {
+    provider: providerOverride || "ollama",
+    apiKey: apiKey || undefined,
+    model: model || undefined,
+  };
+
   try {
-    const content = await generateContent(fullPrompt);
-    return Response.json({ content });
+    const result = await generateViaProvider(fullPrompt, config);
+    return Response.json({ content: result.content });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return Response.json({ error: message }, { status: 500 });

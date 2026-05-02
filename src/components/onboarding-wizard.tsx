@@ -42,6 +42,7 @@ export function OnboardingWizard() {
   const [visible, setVisible] = useState(false);
   const [profileOk, setProfileOk] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(false);
+  const [profileError, setProfileError] = useState(false);
 
   // Post generation state
   const [postTopic, setPostTopic] = useState("");
@@ -66,17 +67,29 @@ export function OnboardingWizard() {
 
   async function checkProfile() {
     setCheckingProfile(true);
+    setProfileError(false);
     try {
       const res = await fetch(apiPath("/api/profile"));
       const data = await res.json();
-      if (!data.error && (data.firstName || data.localizedFirstName)) {
+      if (data.connected && data.firstName) {
+        // Store profile for the sidebar/avatar display
+        const pic = data.profilePicture || "";
+        const isUrl = pic.startsWith("http");
+        localStorage.setItem("mc_linkedin_profile", JSON.stringify({
+          firstName: data.firstName,
+          lastName: data.lastName || "",
+          headline: data.headline || "",
+          profilePicture: isUrl ? pic : "",
+          authorUrn: data.authorUrn,
+          connectedAt: Date.now(),
+        }));
         setProfileOk(true);
         setTimeout(() => setStep(1), 500);
       } else {
-        setProfileOk(false);
+        setProfileError(true);
       }
     } catch {
-      setProfileOk(false);
+      setProfileError(true);
     } finally {
       setCheckingProfile(false);
     }
@@ -86,10 +99,11 @@ export function OnboardingWizard() {
     if (!postTopic.trim()) return;
     setGenerating(true);
     try {
+      const llmConf = JSON.parse(localStorage.getItem("mc_llm_config") || "{}");
       const res = await fetch(apiPath("/api/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: postTopic }),
+        body: JSON.stringify({ prompt: postTopic, ...llmConf }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -98,7 +112,7 @@ export function OnboardingWizard() {
       const scoreRes = await fetch(apiPath("/api/score"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: data.content }),
+        body: JSON.stringify({ content: data.content, ...llmConf }),
       });
       const scoreData = await scoreRes.json();
       if (!scoreData.error) setScore(scoreData.score);
@@ -118,9 +132,16 @@ export function OnboardingWizard() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <div className="absolute inset-0 overlay" />
       <div className="relative z-10 w-full max-w-lg mx-4 animate-scale-in">
         <GlassCard padding="lg" className="border-[var(--color-accent-border)]">
+          {/* Close button — visible at all steps */}
+          <button
+            onClick={close}
+            className="absolute top-4 right-4 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors text-sm font-medium"
+          >
+            Passer
+          </button>
           {/* Step indicator */}
           <div className="flex items-center gap-2 mb-6">
             {STEPS.map((s, i) => (
@@ -152,16 +173,45 @@ export function OnboardingWizard() {
           {/* Step 1 Content: LinkedIn Connection Check */}
           {step === 0 && (
             <div className="space-y-4">
-              {profileOk ? (
-                <div className="text-center animate-fade-in">
-                  <div className="flex items-center justify-center gap-2 text-[var(--color-success)] mb-2">
-                    <CheckCircle className="h-5 w-5" /> Connected !
-                  </div>
-                  {profile && (
-                    <p className="text-sm text-[var(--color-text-secondary)]">
-                      {profile.firstName} {profile.lastName} — {profile.headline}
+              {profileError ? (
+                <div className="text-center animate-fade-in space-y-3">
+                  <div className="bg-[var(--color-warning-muted)] border border-[var(--color-warning)]/30 rounded-xl p-4">
+                    <p className="text-sm text-[var(--color-warning)] font-medium mb-1">
+                      Connexion LinkedIn indisponible
                     </p>
-                  )}
+                    <p className="text-xs text-[var(--color-text-secondary)]">
+                      Impossible de vérifier ton compte LinkedIn pour le moment. Tout le reste fonctionne : éditeur, scoring IA, templates.
+                    </p>
+                  </div>
+                  <GradientButton onClick={() => setStep(1)} variant="primary" className="w-full justify-center">
+                    Continuer <ArrowRight className="h-4 w-4" />
+                  </GradientButton>
+                </div>
+              ) : profileOk ? (
+                <div className="text-center animate-fade-in space-y-3">
+                  <div className="flex justify-center">
+                    {profile?.profilePicture ? (
+                      <img src={profile.profilePicture} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-[var(--color-success)] shadow-sm" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-white font-bold text-xl border-2 border-[var(--color-success)]">
+                        {profile?.firstName?.[0] || "J"}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-center gap-2 text-[var(--color-success)] mb-1">
+                      <CheckCircle className="h-4 w-4" /> Connecté !
+                    </div>
+                    <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                      {profile?.firstName} {profile?.lastName}
+                    </p>
+                    {profile?.headline && (
+                      <p className="text-xs text-[var(--color-text-secondary)] mt-0.5 line-clamp-1">{profile.headline}</p>
+                    )}
+                  </div>
+                  <GradientButton onClick={() => setStep(1)} variant="primary" className="w-full justify-center">
+                    Continuer <ArrowRight className="h-4 w-4" />
+                  </GradientButton>
                 </div>
               ) : (
                 <GradientButton
@@ -171,15 +221,10 @@ export function OnboardingWizard() {
                   className="w-full justify-center"
                   size="lg"
                 >
-                  <Link2 className="h-5 w-5" /> Vérifier la connexion
+                  <Link2 className="h-5 w-5" /> Connecter LinkedIn
                 </GradientButton>
               )}
 
-              {profileOk && (
-                <GradientButton onClick={() => setStep(1)} variant="primary" className="w-full justify-center" size="md">
-                  Continuer <ArrowRight className="h-4 w-4" />
-                </GradientButton>
-              )}
             </div>
           )}
 

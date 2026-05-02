@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { generateContent } from "@/lib/llm";
+import { generateViaProvider, type ProviderConfig } from "@/lib/llm-providers";
 import { prisma } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
-  const { themes, count, templateId } = await request.json();
+  const { themes, count, templateId, provider: providerOverride, apiKey, model } = await request.json();
 
   let templateInstruction = "";
   if (templateId) {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const prompt = `Tu es un expert en copywriting LinkedIn. Génère exactement ${count || 5} posts LinkedIn sur les thèmes suivants: ${themes.join(", ")}.${templateInstruction}
+  const promptText = `Tu es un expert en copywriting LinkedIn. Génère exactement ${count || 5} posts LinkedIn sur les thèmes suivants: ${themes.join(", ")}.${templateInstruction}
 
 Chaque post doit être unique, engageant et optimisé pour LinkedIn.
 Réponds UNIQUEMENT en JSON valide avec ce format exact:
@@ -21,15 +21,20 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact:
 
 Pas de commentaire, pas d'explication. Juste le JSON.`;
 
+  const config: ProviderConfig = {
+    provider: providerOverride || "ollama",
+    apiKey: apiKey || undefined,
+    model: model || undefined,
+  };
+
   try {
-    const raw = await generateContent(prompt);
+    const raw = (await generateViaProvider(promptText, config)).content;
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return Response.json({ error: "Could not parse AI response" }, { status: 500 });
     }
     const result = JSON.parse(jsonMatch[0]);
 
-    // Save all posts as drafts
     const created = [];
     for (const p of result.posts) {
       const post = await prisma.post.create({

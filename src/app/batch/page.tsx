@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, Sparkles, Check, Calendar, Loader2, Clock } from "lucide-react";
+import { Zap, Sparkles, Check, Calendar, Loader2 } from "lucide-react";
 import { apiPath } from "@/lib/routes";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GradientButton } from "@/components/ui/gradient-button";
@@ -41,6 +41,7 @@ export default function BatchPage() {
       const generated: BatchPost[] = [];
       for (let i = 0; i < totalCount; i++) {
         const theme = themeList[i % themeList.length] || themeList[0];
+        const llmConfig = JSON.parse(localStorage.getItem("mc_llm_config") || "{}");
         const res = await fetch(apiPath("/api/batch"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -48,6 +49,9 @@ export default function BatchPage() {
             themes: [theme],
             count: 1,
             templateId: templateId || undefined,
+            provider: llmConfig.provider,
+            apiKey: llmConfig.apiKey,
+            model: llmConfig.model,
           }),
         });
         const data = await res.json();
@@ -231,7 +235,7 @@ export default function BatchPage() {
                 key={post.id}
                 interactive
                 padding="md"
-                className={selected.has(post.id) ? "!border-[var(--color-accent-border)] glow-accent" : ""}
+                className={selected.has(post.id) ? "!border-[var(--color-accent-border)] surface-accent" : ""}
               >
                 <div className="flex items-start gap-3">
                   <button

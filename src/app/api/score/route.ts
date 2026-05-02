@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { generateContent } from "@/lib/llm";
+import { generateViaProvider, type ProviderConfig } from "@/lib/llm-providers";
 import { prisma } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
-  const { content, postId } = await request.json();
+  const { content, postId, provider: providerOverride, apiKey, model } = await request.json();
 
-  const prompt = `Tu es un expert LinkedIn. Analyse ce post LinkedIn et donne:
+  const promptText = `Tu es un expert LinkedIn. Analyse ce post LinkedIn et donne:
 1. Un score de 0 à 100 (basé sur: hook, clarté, engagement, CTA, longueur optimale)
 2. Un feedback concret avec des suggestions d'amélioration
 
@@ -15,16 +15,20 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact:
 Post à analyser:
 ${content}`;
 
+  const config: ProviderConfig = {
+    provider: providerOverride || "ollama",
+    apiKey: apiKey || undefined,
+    model: model || undefined,
+  };
+
   try {
-    const raw = await generateContent(prompt);
-    // Extract JSON from response
+    const raw = (await generateViaProvider(promptText, config)).content;
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return Response.json({ error: "Could not parse AI response" }, { status: 500 });
     }
     const result = JSON.parse(jsonMatch[0]);
 
-    // Save score to post if postId provided
     if (postId) {
       await prisma.post.update({
         where: { id: postId },
