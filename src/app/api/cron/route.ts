@@ -17,7 +17,12 @@ export async function GET() {
 
   for (const post of duePosts) {
     try {
-      await publishToLinkedIn(post.content);
+      const author = process.env.LINKEDIN_AUTHOR_URN || "";
+      await publishToLinkedIn({
+        author,
+        commentary: post.content,
+        visibility: "PUBLIC",
+      });
       await prisma.post.update({
         where: { id: post.id },
         data: { status: "published", publishedAt: new Date() },
