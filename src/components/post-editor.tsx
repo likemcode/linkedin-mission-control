@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
+  AlertTriangle,
+  CheckCircle2,
   Sparkles,
   Wand2,
   History,
@@ -26,6 +28,8 @@ import { EditorToolbar } from "@/components/editor-toolbar";
 import { CharacterGauge } from "@/components/character-gauge";
 import { DiffView } from "@/components/diff-view";
 import { LinkedInPreview } from "@/components/linkedin-preview";
+import { useLLMStatus } from "@/components/llm-status";
+import type { Provider } from "@/lib/llm-providers";
 
 type Post = {
   id: string;
@@ -44,6 +48,16 @@ type Template = { id: string; name: string; structure: string };
 type Series = { id: string; name: string };
 type ScoreResult = { score: number; feedback: string; hashtags: string[] };
 type ImproveOptions = { instructionOverride?: string; successMessage?: string };
+type PublishReadiness =
+  | { state: "loading" }
+  | { state: "error"; message: string }
+  | {
+      state: "ready";
+      matonConfigured: boolean;
+      authorConfigured: boolean;
+      connectionPinned: boolean;
+      apiMode: "gateway" | "v1";
+    };
 
 type AssistantStatus =
   | { type: "idle" }
@@ -83,6 +97,84 @@ function AssistantStatusPanel({ status }: { status: AssistantStatus }) {
   );
 }
 
+function LinkedInPublishStatus({
+  readiness,
+  hasAuthor,
+  hasUnsupportedMedia,
+}: {
+  readiness: PublishReadiness;
+  hasAuthor: boolean;
+  hasUnsupportedMedia: boolean;
+}) {
+  if (readiness.state === "loading") {
+    return (
+      <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-2)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+        Vérification de la connexion LinkedIn...
+      </div>
+    );
+  }
+
+  if (readiness.state === "error") {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-[var(--color-error)]/20 bg-[var(--color-error-muted)] px-3 py-2 text-xs text-[var(--color-error)]">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>{readiness.message}</span>
+      </div>
+    );
+  }
+
+  if (!readiness.matonConfigured) {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-[var(--color-warning)]/20 bg-[var(--color-warning-muted)] px-3 py-2 text-xs text-[var(--color-warning)]">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>Maton n&apos;est pas configuré. Ajoute MATON_API_KEY avant de publier sur LinkedIn.</span>
+      </div>
+    );
+  }
+
+  if (!readiness.authorConfigured && !hasAuthor) {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-[var(--color-warning)]/20 bg-[var(--color-warning-muted)] px-3 py-2 text-xs text-[var(--color-warning)]">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>Compte LinkedIn non identifié. Vérifie la connexion profil ou définis LINKEDIN_AUTHOR_URN.</span>
+      </div>
+    );
+  }
+
+  if (hasUnsupportedMedia) {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-[var(--color-warning)]/20 bg-[var(--color-warning-muted)] px-3 py-2 text-xs text-[var(--color-warning)]">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>Cette image ne peut pas encore être publiée. Utilise une image uploadée dans l&apos;éditeur ou retire-la.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-[var(--color-success)]/20 bg-[var(--color-success-muted)] px-3 py-2 text-xs text-[var(--color-success)]">
+      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>
+        LinkedIn prêt à publier via Maton {readiness.connectionPinned ? "(connexion dédiée)" : "(connexion active)"}.
+      </span>
+    </div>
+  );
+}
+
+function getLLMConfig(): { provider?: Provider; apiKey?: string; model?: string } {
+  try {
+    const raw = localStorage.getItem("mc_llm_config");
+    if (!raw) return {};
+    const c = JSON.parse(raw);
+    return {
+      provider: c.provider,
+      apiKey: c.apiKey || undefined,
+      model: c.model || undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export function PostEditor({ post }: { post?: Post }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -115,9 +207,13 @@ export function PostEditor({ post }: { post?: Post }) {
   const [showDiff, setShowDiff] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [publishReadiness, setPublishReadiness] = useState<PublishReadiness>({ state: "loading" });
 
   // Profile data
   const { profile } = useProfile();
+  const llmStatus = useLLMStatus();
+
+  const [publishing, setPublishing] = useState(false);
 
   // Auto-save
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -127,6 +223,34 @@ export function PostEditor({ post }: { post?: Post }) {
     fetch(apiPath("/api/templates")).then((r) => r.json()).then(setTemplates);
     fetch(apiPath("/api/series")).then((r) => r.json()).then(setSeriesList);
   }, [post]);
+
+  useEffect(() => {
+    let active = true;
+
+    fetch(apiPath("/api/publish/status"))
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        setPublishReadiness({
+          state: "ready",
+          matonConfigured: Boolean(data.matonConfigured),
+          authorConfigured: Boolean(data.authorConfigured),
+          connectionPinned: Boolean(data.connectionPinned),
+          apiMode: data.apiMode === "v1" ? "v1" : "gateway",
+        });
+      })
+      .catch((error) => {
+        if (!active) return;
+        setPublishReadiness({
+          state: "error",
+          message: error instanceof Error ? error.message : "Impossible de vérifier LinkedIn.",
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!post) {
@@ -160,22 +284,18 @@ export function PostEditor({ post }: { post?: Post }) {
   }, [content, imageUrl, post]);
 
   // Keyboard shortcuts
-  const contentRef = useRef(content);
-  contentRef.current = content;
-  const promptRef = useRef(prompt);
-  promptRef.current = prompt;
-  const imageUrlRef = useRef(imageUrl);
-  imageUrlRef.current = imageUrl;
+  const generateShortcutRef = useRef<() => void>(() => {});
+  const saveDraftShortcutRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        runGenerate();
+        generateShortcutRef.current();
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
-        handleSave("draft");
+        saveDraftShortcutRef.current();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -233,9 +353,8 @@ export function PostEditor({ post }: { post?: Post }) {
 
     // Find next Tue/Wed/Thu at 8h or 12h
     const targetDays = [2, 3, 4]; // Tue, Wed, Thu
-    const targetHours = [8, 12];
 
-    let bestDate = new Date(now);
+    const bestDate = new Date(now);
     bestDate.setMinutes(0, 0, 0);
 
     for (let d = 0; d < 7; d++) {
@@ -260,6 +379,11 @@ export function PostEditor({ post }: { post?: Post }) {
     const isImproving = Boolean(trimmedContent);
     const instruction = options.instructionOverride?.trim() || trimmedPrompt;
 
+    if (!llmStatus.configured) {
+      toast("warning", "Configure un provider IA dans Paramètres avant de générer.");
+      return;
+    }
+
     if (!instruction && !isImproving) {
       toast("warning", "Décris le sujet du post pour lancer la génération.");
       return;
@@ -280,12 +404,16 @@ export function PostEditor({ post }: { post?: Post }) {
       const selectedTemplate = templates.find((t) => t.id === templateId);
       const templateInstruction = selectedTemplate ? `\n\nUtilise cette structure:\n${selectedTemplate.structure}` : "";
 
+      const llmConfig = getLLMConfig();
       const res = await fetch(apiPath("/api/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: (instruction || "Améliore ce post") + templateInstruction,
           existingContent: content || undefined,
+          provider: llmConfig.provider,
+          apiKey: llmConfig.apiKey,
+          model: llmConfig.model,
         }),
       });
       const data = await res.json();
@@ -300,7 +428,7 @@ export function PostEditor({ post }: { post?: Post }) {
         fetch(apiPath("/api/score"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: data.content, postId: post?.id }),
+          body: JSON.stringify({ content: data.content, postId: post?.id, ...getLLMConfig() }),
         })
           .then((r) => r.json())
           .then((scoreData) => {
@@ -329,13 +457,18 @@ export function PostEditor({ post }: { post?: Post }) {
   async function handleScore() {
     if (!content.trim()) return toast("warning", "Écris ou génère un post avant de scorer.");
 
+    if (!llmStatus.configured) {
+      toast("warning", "Configure un provider IA dans Paramètres avant de scorer.");
+      return;
+    }
+
     setScoring(true);
     setAssistantStatus({ type: "loading", title: "Analyse en cours...", message: "Évaluation du potentiel d'engagement..." });
     try {
       const res = await fetch(apiPath("/api/score"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, postId: post?.id }),
+        body: JSON.stringify({ content, postId: post?.id, ...getLLMConfig() }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -366,7 +499,7 @@ export function PostEditor({ post }: { post?: Post }) {
       const res = await fetch(apiPath("/api/recycle"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId: post.id, angle: prompt || undefined }),
+        body: JSON.stringify({ postId: post.id, angle: prompt || undefined, ...getLLMConfig() }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -377,6 +510,27 @@ export function PostEditor({ post }: { post?: Post }) {
     } finally {
       setRecycling(false);
     }
+  }
+
+  const hasLinkedInAuthor = Boolean(profile?.authorUrn);
+  const hasUnsupportedMedia = Boolean(
+    imageUrl && !imageUrl.startsWith("/uploads/") && !imageUrl.startsWith("urn:li:image:")
+  );
+  const linkedInReady =
+    publishReadiness.state === "ready" &&
+    publishReadiness.matonConfigured &&
+    (publishReadiness.authorConfigured || hasLinkedInAuthor) &&
+    !hasUnsupportedMedia;
+
+  function publishBlockReason() {
+    if (publishReadiness.state === "loading") return "Connexion LinkedIn en cours de vérification.";
+    if (publishReadiness.state === "error") return publishReadiness.message;
+    if (!publishReadiness.matonConfigured) return "Configure MATON_API_KEY avant de publier.";
+    if (!publishReadiness.authorConfigured && !hasLinkedInAuthor) {
+      return "Connecte le profil LinkedIn ou configure LINKEDIN_AUTHOR_URN.";
+    }
+    if (hasUnsupportedMedia) return "Retire l'image externe ou utilise l'upload intégré avant de publier.";
+    return null;
   }
 
   async function handleSave(status: "draft" | "scheduled") {
@@ -390,11 +544,13 @@ export function PostEditor({ post }: { post?: Post }) {
         imageUrls: imageUrl || null,
       };
 
-      await fetch(apiPath(post ? `/api/posts/${post.id}` : "/api/posts"), {
+      const res = await fetch(apiPath(post ? `/api/posts/${post.id}` : "/api/posts"), {
         method: post ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      const saved = await res.json();
+      if (!res.ok || saved.error) throw new Error(saved.error || "Sauvegarde impossible");
 
       if (!post) {
         localStorage.removeItem("mc_draft");
@@ -403,28 +559,83 @@ export function PostEditor({ post }: { post?: Post }) {
       toast("success", status === "scheduled" ? "Post planifié" : "Brouillon sauvegardé");
       router.push("/");
       router.refresh();
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Erreur lors de la sauvegarde");
     } finally {
       setSaving(false);
     }
   }
 
   async function handlePublish() {
-    if (!post) {
-      // Save draft first, then publish
+    if (!content.trim()) return toast("warning", "Écris un post avant de publier.");
+    if (!linkedInReady) {
+      const reason = publishBlockReason() ?? "LinkedIn n'est pas prêt à publier.";
+      toast("warning", reason);
+      setAssistantStatus({ type: "error", message: reason });
+      return;
     }
-    toast("success", "Post publié sur LinkedIn !");
-    router.push("/");
+
+    setPublishing(true);
+    setAssistantStatus({
+      type: "loading",
+      title: "Publication LinkedIn...",
+      message: imageUrl ? "Upload média et création du post en cours." : "Création du post LinkedIn en cours.",
+    });
+    try {
+      // Save first (creates the post if new)
+      const body = {
+        content,
+        status: "draft" as const,
+        scheduledAt: null,
+        seriesId: seriesId || null,
+        imageUrls: imageUrl || null,
+      };
+      const saveRes = await fetch(apiPath(post ? `/api/posts/${post.id}` : "/api/posts"), {
+        method: post ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const saved = await saveRes.json();
+      if (!saveRes.ok || saved.error) throw new Error(saved.error || "Sauvegarde impossible");
+
+      // Publish via Maton
+      const publishRes = await fetch(apiPath("/api/publish"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: post?.id ?? saved.id, authorUrn: profile?.authorUrn }),
+      });
+      const published = await publishRes.json();
+      if (!publishRes.ok || published.error) throw new Error(published.error || "Publication impossible");
+
+      if (!post) {
+        localStorage.removeItem("mc_draft");
+        localStorage.removeItem("mc_draft_image");
+      }
+      toast("success", "Post publié sur LinkedIn !");
+      setAssistantStatus({ type: "success", message: "Post publié sur LinkedIn." });
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur lors de la publication";
+      toast("error", msg);
+      setAssistantStatus({ type: "error", message: msg });
+    } finally {
+      setPublishing(false);
+    }
   }
 
+  generateShortcutRef.current = () => runGenerate();
+  saveDraftShortcutRef.current = () => handleSave("draft");
+
   const charCount = content.length;
-  const isBusy = generating || scoring || recycling || saving;
+  const isBusy = generating || scoring || recycling || saving || publishing;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-8rem)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:h-[calc(100vh-8rem)]">
 
       {/* COLUMN 1: AI Assistant (Left) */}
-      <div className="lg:col-span-3 flex flex-col gap-4 overflow-y-auto pr-2 pb-8">
-        <GlassCard padding="md" className="flex-1 flex flex-col gap-4">
+      <div className="order-2 flex flex-col gap-4 lg:order-1 lg:col-span-3 lg:overflow-y-auto lg:pr-2 lg:pb-8">
+        <GlassCard padding="md" className="flex flex-col gap-4 lg:flex-1">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="h-5 w-5 text-[var(--color-accent)]" />
             <h2 className="font-semibold text-lg">Assistant IA</h2>
@@ -461,7 +672,7 @@ export function PostEditor({ post }: { post?: Post }) {
 
             <GradientButton
               onClick={handleGenerate}
-              disabled={isBusy || (!prompt && !content)}
+              disabled={isBusy || !llmStatus.configured || (!prompt && !content)}
               loading={generating}
               variant="primary"
               className="w-full justify-center py-2.5"
@@ -474,7 +685,7 @@ export function PostEditor({ post }: { post?: Post }) {
                 onClick={handleUndoDiff}
                 className="flex items-center justify-center gap-2 w-full py-2 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
               >
-                <History className="h-3.5 w-3.5" /> Annuler l'amélioration
+                <History className="h-3.5 w-3.5" /> Annuler l&apos;amélioration
               </button>
             )}
 
@@ -487,7 +698,7 @@ export function PostEditor({ post }: { post?: Post }) {
           <div className="flex flex-col gap-3">
             <GradientButton
               onClick={handleScore}
-              disabled={isBusy || !content}
+              disabled={isBusy || !llmStatus.configured || !content}
               loading={scoring}
               variant="secondary"
               className="w-full justify-center"
@@ -531,11 +742,11 @@ export function PostEditor({ post }: { post?: Post }) {
       </div>
 
       {/* COLUMN 2: Editor (Center) */}
-      <div className="lg:col-span-5 flex flex-col gap-4">
-        <GlassCard padding="none" className="flex-1 flex flex-col overflow-hidden">
+      <div className="order-1 flex flex-col gap-4 lg:order-2 lg:col-span-5">
+        <GlassCard padding="none" className="flex min-h-[420px] flex-col overflow-hidden lg:min-h-0 lg:flex-1">
           {/* Toolbar */}
           <div className="flex flex-col border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-tertiary)]">
-            <div className="flex items-center justify-between px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
               <EditorToolbar content={content} setContent={setContent} textareaRef={textareaRef} />
               {lastSaved && (
                 <span className="text-xs text-[var(--color-text-muted)] flex items-center gap-1 shrink-0">
@@ -585,7 +796,7 @@ export function PostEditor({ post }: { post?: Post }) {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Écris ton post LinkedIn ici..."
-                  className="w-full h-full bg-transparent p-5 text-[var(--color-text-primary)] resize-none focus:outline-none text-[15px] leading-relaxed"
+                  className="h-full min-h-[260px] w-full resize-none bg-transparent p-5 text-[15px] leading-relaxed text-[var(--color-text-primary)] focus:outline-none lg:min-h-0"
                 />
               </div>
             </>
@@ -606,7 +817,7 @@ export function PostEditor({ post }: { post?: Post }) {
         {/* Image upload button + Publish/Schedule */}
         <GlassCard padding="md" className="flex flex-col gap-3">
           {/* Image upload row */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <label className="flex items-center gap-2 cursor-pointer text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors px-3 py-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] border border-dashed border-[var(--color-border-default)]">
               <ImageIcon className="h-4 w-4" />
               {uploading ? "Upload..." : imageUrl ? "Changer l'image" : "Ajouter une image"}
@@ -631,8 +842,14 @@ export function PostEditor({ post }: { post?: Post }) {
             </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 items-end">
-            <div className="flex-1 w-full grid grid-cols-2 gap-3">
+          <LinkedInPublishStatus
+            readiness={publishReadiness}
+            hasAuthor={hasLinkedInAuthor}
+            hasUnsupportedMedia={hasUnsupportedMedia}
+          />
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="grid w-full flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Série</label>
                 <select
@@ -654,16 +871,16 @@ export function PostEditor({ post }: { post?: Post }) {
                 />
               </div>
             </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <GradientButton onClick={() => handleSave("draft")} disabled={isBusy || !content} variant="secondary">
+            <div className="flex w-full gap-2 sm:w-auto">
+              <GradientButton onClick={() => handleSave("draft")} disabled={isBusy || !content} variant="secondary" className="flex-1 sm:flex-none">
                 <Save className="h-4 w-4" /> {post ? "Sauvegarder" : "Brouillon"}
               </GradientButton>
               {scheduledAt ? (
-                <GradientButton onClick={() => handleSave("scheduled")} disabled={isBusy || !content} variant="primary">
+                <GradientButton onClick={() => handleSave("scheduled")} disabled={isBusy || !content} variant="primary" className="flex-1 sm:flex-none">
                   <Calendar className="h-4 w-4" /> Planifier
                 </GradientButton>
               ) : (
-                <GradientButton onClick={handlePublish} disabled={isBusy || !content} variant="success">
+                <GradientButton onClick={handlePublish} disabled={isBusy || !content || !linkedInReady} loading={publishing} variant="success" className="flex-1 sm:flex-none">
                   <Send className="h-4 w-4" /> Publier
                 </GradientButton>
               )}
@@ -673,7 +890,7 @@ export function PostEditor({ post }: { post?: Post }) {
       </div>
 
       {/* COLUMN 3: LinkedIn Preview (Right) */}
-      <div className="lg:col-span-4 flex flex-col overflow-y-auto pb-8">
+      <div className="order-3 flex flex-col pb-8 lg:col-span-4 lg:overflow-y-auto">
         <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] mb-3 flex items-center gap-2">
           <ImageIcon className="h-4 w-4" /> Aperçu LinkedIn
         </h3>
