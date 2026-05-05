@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 
-type GlassCardProps = {
+type SurfaceProps = {
   children: ReactNode;
   className?: string;
   interactive?: boolean;
@@ -8,10 +8,10 @@ type GlassCardProps = {
 };
 
 const paddings = {
-  none: "",
-  sm: "p-3",
-  md: "p-5",
-  lg: "p-6",
+  none: "surface-p-none",
+  sm: "surface-p-sm",
+  md: "surface-p-md",
+  lg: "surface-p-lg",
 };
 
 export function GlassCard({
@@ -19,10 +19,10 @@ export function GlassCard({
   className = "",
   interactive = false,
   padding = "md",
-}: GlassCardProps) {
+}: SurfaceProps) {
   return (
     <div
-      className={`glass-card ${interactive ? "glass-card-interactive cursor-pointer" : ""} ${paddings[padding]} ${className}`}
+      className={`surface ${interactive ? "surface-interactive" : ""} ${paddings[padding]} ${className}`}
     >
       {children}
     </div>

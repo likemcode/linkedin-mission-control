@@ -63,7 +63,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`${t.exiting ? "animate-toast-out" : "animate-toast-in"} flex items-start gap-3 rounded-xl border ${borderColors[t.type]} bg-[var(--color-bg-secondary)]/95 backdrop-blur-lg px-4 py-3 shadow-lg`}
+            className={`${t.exiting ? "animate-toast-out" : "animate-toast-in"} flex items-start gap-3 rounded-lg border ${borderColors[t.type]} bg-white px-4 py-3 shadow-lg`}
           >
             {icons[t.type]}
             <p className="text-sm text-[var(--color-text-primary)] flex-1">{t.message}</p>

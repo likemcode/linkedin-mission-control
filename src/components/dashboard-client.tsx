@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { KPICard } from "@/components/ui/kpi-card";
 import { GlassCard } from "@/components/ui/glass-card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -25,14 +26,17 @@ export function DashboardClient({
   allAnalytics: any[];
 }) {
   const { profile } = useProfile();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const maxSpark = Math.max(...sparkline, 1);
   const weekDays = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-  const today = new Date();
-  const dayLabels = [...Array(7)].map((_, i) => {
+  const dayLabels = mounted ? [...Array(7)].map((_, i) => {
+    const today = new Date();
     const d = new Date(today);
     d.setDate(d.getDate() - (6 - i));
     return weekDays[d.getDay()];
-  });
+  }) : weekDays;
 
   // Top posts by analytics
   const topPosts = allAnalytics
@@ -47,8 +51,8 @@ export function DashboardClient({
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in-up">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Bonjour {profile?.firstName ? profile.firstName : "👋"}, cette semaine…
+          <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+            Bonjour {profile?.firstName ? profile.firstName : "👋"}
           </h1>
           <p className="text-sm text-[var(--color-text-secondary)] mt-1">
             {drafts.length > 0
@@ -179,7 +183,7 @@ export function DashboardClient({
                             </span>
                           )}
                           <span className="text-xs text-[var(--color-text-muted)]">
-                            {formatRelativeDate(post.createdAt)}
+                            {mounted ? formatRelativeDate(post.createdAt) : ""}
                           </span>
                         </div>
                       </div>
@@ -252,7 +256,7 @@ export function DashboardClient({
                           {post.content.length > 80 ? "..." : ""}
                         </p>
                         <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                          {post.scheduledAt && formatScheduledDate(new Date(post.scheduledAt))}
+                          {mounted && post.scheduledAt ? formatScheduledDate(new Date(post.scheduledAt)) : post.scheduledAt ? "" : ""}
                         </p>
                       </div>
                       <StatusBadge status="scheduled" />
@@ -391,7 +395,7 @@ export function DashboardClient({
                         {post.content.length > 100 ? "..." : ""}
                       </p>
                       <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                        Publié {post.publishedAt ? formatRelativeDate(post.publishedAt) : ""}
+                        Publié {mounted && post.publishedAt ? formatRelativeDate(post.publishedAt) : ""}
                       </p>
                     </div>
                     {post.score !== null && (

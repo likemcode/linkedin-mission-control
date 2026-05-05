@@ -39,7 +39,7 @@ const colorMap = {
 export function KPICard({ icon: Icon, label, value, color, className = "" }: KPICardProps) {
   const c = colorMap[color];
   return (
-    <div className={`glass-card p-4 ${className}`}>
+    <div className={`surface surface-p-md ${className}`}>
       <div className="flex items-center gap-3">
         <div className={`h-10 w-10 rounded-xl ${c.bg} flex items-center justify-center shrink-0`}>
           <Icon className={`h-5 w-5 ${c.icon}`} />
