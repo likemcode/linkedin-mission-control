@@ -75,7 +75,7 @@ export default function AnalyticsPage() {
   }, []);
 
   function heatColor(val: number) {
-    if (val === 0) return "rgba(255,255,255,0.02)";
+    if (val === 0) return "rgba(0,0,0,0.02)";
     const intensity = val / heatmapMax;
     const r = Math.round(59 + (139 - 59) * intensity);
     const g = Math.round(130 + (92 - 130) * intensity);
@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
               </table>
             </div>
             <div className="flex items-center justify-end gap-2 mt-2 text-[10px] text-[var(--color-text-muted)]">
-              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: "rgba(255,255,255,0.02)" }} />
+              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: "rgba(0,0,0,0.02)" }} />
               <span>Faible</span>
               <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: "rgba(139, 92, 246, 0.4)" }} />
               <span>Moyen</span>
@@ -255,7 +255,7 @@ export default function AnalyticsPage() {
               </thead>
               <tbody>
                 {posts.map((post) => (
-                  <tr key={post.id} className="border-b border-[var(--color-border-subtle)] hover:bg-[rgba(255,255,255,0.02)] transition-colors">
+                  <tr key={post.id} className="border-b border-[var(--color-border-subtle)] hover:bg-[rgba(0,0,0,0.02)] transition-colors">
                     <td className="p-4 max-w-xs">
                       <Link href={`/editor/${post.id}`} className="text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors line-clamp-1">
                         {post.content.slice(0, 60)}

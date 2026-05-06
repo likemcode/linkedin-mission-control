@@ -226,7 +226,7 @@ export default function TemplatesPage() {
             <GlassCard
               interactive
               padding="md"
-              className={selected?.id === t.id ? "!border-[var(--color-accent-border)] glow-accent" : ""}
+              className={selected?.id === t.id ? "!border-[var(--color-accent-border)] surface-accent" : ""}
             >
               <div className="cursor-pointer" onClick={() => setSelected(selected?.id === t.id ? null : t)}>
                 <div className="flex items-center justify-between mb-3">
@@ -240,13 +240,13 @@ export default function TemplatesPage() {
                     <span className="text-xs text-[var(--color-text-muted)] mr-2">
                       {t.usageCount > 0 ? `Utilisé ${t.usageCount} fois` : "Jamais utilisé"}
                     </span>
-                    <button onClick={() => handleDuplicate(t)} className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:bg-[rgba(255,255,255,0.05)] transition-colors" title="Dupliquer">
+                    <button onClick={() => handleDuplicate(t)} className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:bg-[rgba(0,0,0,0.05)] transition-colors" title="Dupliquer">
                       <Copy className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => startEdit(t)} className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-info)] hover:bg-[rgba(255,255,255,0.05)] transition-colors" title="Modifier">
+                    <button onClick={() => startEdit(t)} className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-info)] hover:bg-[rgba(0,0,0,0.05)] transition-colors" title="Modifier">
                       <Edit3 className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => handleDelete(t.id)} className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-error)] hover:bg-[rgba(255,255,255,0.05)] transition-colors" title="Supprimer">
+                    <button onClick={() => handleDelete(t.id)} className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-error)] hover:bg-[rgba(0,0,0,0.05)] transition-colors" title="Supprimer">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>

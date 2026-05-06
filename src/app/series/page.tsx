@@ -141,14 +141,14 @@ export default function SeriesPage() {
 
                 <div className="space-y-2 mt-auto">
                   {s.posts.length === 0 ? (
-                    <div className="text-sm text-[var(--color-text-muted)] italic p-3 bg-[rgba(255,255,255,0.02)] rounded-lg border border-[var(--color-border-subtle)]">
+                    <div className="text-sm text-[var(--color-text-muted)] italic p-3 bg-[rgba(0,0,0,0.02)] rounded-lg border border-[var(--color-border-subtle)]">
                       Aucun post dans cette série. Sélectionne cette série dans l&apos;éditeur.
                     </div>
                   ) : (
                     s.posts.map((post, idx) => (
                       <div
                         key={post.id}
-                        className="flex items-center gap-3 p-3 bg-[rgba(255,255,255,0.02)] border border-[var(--color-border-subtle)] rounded-lg hover:border-[var(--color-border-hover)] transition-colors cursor-pointer group"
+                        className="flex items-center gap-3 p-3 bg-[rgba(0,0,0,0.02)] border border-[var(--color-border-subtle)] rounded-lg hover:border-[var(--color-border-hover)] transition-colors cursor-pointer group"
                         onClick={() => router.push(`/editor/${post.id}`)}
                       >
                         <div className="text-xs font-bold text-[var(--color-text-muted)] w-6 shrink-0">#{idx + 1}</div>

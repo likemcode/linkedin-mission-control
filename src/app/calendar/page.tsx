@@ -164,7 +164,7 @@ export default function CalendarPage() {
                     className={`aspect-square rounded-xl p-1 flex flex-col items-center justify-start gap-1 transition-all text-sm relative
                       ${isSelected
                         ? "bg-[var(--color-accent-muted)] border border-[var(--color-accent-border)]"
-                        : "hover:bg-[rgba(255,255,255,0.04)] border border-transparent"
+                        : "hover:bg-[var(--color-surface-2)] border border-transparent"
                       }
                       ${!isCurrentMonth ? "opacity-30" : ""}
                     `}
@@ -237,7 +237,7 @@ export default function CalendarPage() {
                   <div className="space-y-2">
                     {selectedDayPosts.map((post) => (
                       <Link key={post.id} href={`/editor/${post.id}`}>
-                        <div className="p-3 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[var(--color-border-subtle)] hover:border-[var(--color-border-hover)] transition-all group">
+                        <div className="p-3 rounded-xl bg-[rgba(0,0,0,0.03)] border border-[var(--color-border-subtle)] hover:border-[var(--color-border-hover)] transition-all group">
                           <div className="flex items-center gap-2 mb-2">
                             <StatusBadge status={post.status} />
                             {post.scheduledAt && (
