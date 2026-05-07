@@ -15,8 +15,14 @@ test.describe("Editor — Core Flow", () => {
     const textarea = page.getByPlaceholder("Écris ton post LinkedIn");
     await textarea.fill("Hello LinkedIn world!");
 
-    // Character gauge should show the count
-    await expect(page.getByText(/chars/)).toBeVisible();
+    await expect(page.getByText("21 chars")).toBeVisible();
+    await expect(page.getByTestId("linkedin-preview-content")).toContainText("Hello LinkedIn world!");
+  });
+
+  test("LinkedIn publish readiness resolves", async ({ page }) => {
+    await expect(
+      page.getByText(/LinkedIn prêt à publier via Maton|Maton n'est pas configuré|Compte LinkedIn non identifié/)
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test("keyboard shortcut Cmd+S saves (triggers save button state)", async ({ page }) => {
@@ -85,8 +91,6 @@ test.describe("Editor — Formatting", () => {
     if (await emojiBtn.isVisible({ timeout: 3000 })) {
       await emojiBtn.click();
       await page.waitForTimeout(500);
-      // After clicking, emoji grid should appear
-      const emojiGrid = page.locator(".animate-scale-in .grid");
       // It's OK if it doesn't appear (component timing), just verify button is functional
       expect(await emojiBtn.isVisible()).toBeTruthy();
     }

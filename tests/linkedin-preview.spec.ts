@@ -22,10 +22,10 @@ test.describe("LinkedIn Preview", () => {
   });
 
   test("engagement bar is displayed", async ({ page }) => {
-    await expect(page.getByText("Like")).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText("Comment")).toBeVisible();
-    await expect(page.getByText("Repost")).toBeVisible();
-    await expect(page.getByText("Send")).toBeVisible();
+    await expect(page.getByText("J'aime")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Commenter")).toBeVisible();
+    await expect(page.getByText("Republier")).toBeVisible();
+    await expect(page.getByText("Envoyer")).toBeVisible();
   });
 
   test("see more appears for long content", async ({ page }) => {

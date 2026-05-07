@@ -64,7 +64,7 @@ test.describe("Calendar Page", () => {
 
   test("legend shows status colors", async ({ page }) => {
     // The legend is inside the calendar card
-    const calendarCard = page.locator(".glass-card").first();
+    const calendarCard = page.locator(".surface").first();
     await expect(calendarCard).toBeVisible({ timeout: 5000 });
     // Check for day-of-week headers
     await expect(page.getByText("Lun")).toBeVisible({ timeout: 3000 });
