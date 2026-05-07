@@ -33,6 +33,10 @@ model Post {
 
   // Recycled from
   recycledFromId String?
+
+  // Media attachments
+  imageUrls   String   @default("") // comma-separated image URLs
+  documentUrl String?  // PDF/Document URL for carousel
 }
 
 model Template {
