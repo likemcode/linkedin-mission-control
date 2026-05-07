@@ -24,6 +24,7 @@ export async function PUT(
       status: body.status,
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
       seriesId: body.seriesId !== undefined ? body.seriesId : undefined,
+      imageUrls: body.imageUrls !== undefined ? body.imageUrls : undefined,
     },
   });
   return Response.json(post);

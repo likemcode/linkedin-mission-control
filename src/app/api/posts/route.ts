@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
       seriesId: body.seriesId ?? null,
       templateId: body.templateId ?? null,
+      imageUrls: body.imageUrls ?? "",
     },
   });
   return Response.json(post);
