@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Bell } from "lucide-react";
 import { apiPath } from "@/lib/routes";
 
 type Notification = {
@@ -51,41 +52,49 @@ export function NotificationBell() {
           setOpen(!open);
           if (!open && unread > 0) markAllRead();
         }}
-        className="relative p-2 hover:text-blue-400 transition-colors"
+        className="relative p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[rgba(255,255,255,0.04)] transition-all"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-        </svg>
+        <Bell className="h-[18px] w-[18px]" />
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 bg-[var(--color-error)] text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center animate-scale-in">
             {unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-10 w-80 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
-          {notifications.length === 0 ? (
-            <div className="p-4 text-sm text-gray-500 text-center">Aucune notification</div>
-          ) : (
-            notifications.map((n) => (
-              <div
-                key={n.id}
-                className={`p-3 border-b border-gray-800 text-sm ${n.read ? "text-gray-500" : "text-gray-200"}`}
-              >
-                <span
-                  className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                    n.type === "success" ? "bg-green-400" : n.type === "error" ? "bg-red-400" : "bg-blue-400"
-                  }`}
-                />
-                {n.message}
-                <div className="text-xs text-gray-600 mt-1">
-                  {new Date(n.createdAt).toLocaleString("fr-FR")}
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-full ml-2 bottom-0 w-80 bg-[var(--color-bg-secondary)]/95 backdrop-blur-xl border border-[var(--color-border-subtle)] rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto animate-scale-in">
+            <div className="p-3 border-b border-[var(--color-border-subtle)]">
+              <span className="text-xs font-semibold text-[var(--color-text-secondary)]">Notifications</span>
+            </div>
+            {notifications.length === 0 ? (
+              <div className="p-6 text-sm text-[var(--color-text-muted)] text-center">Aucune notification</div>
+            ) : (
+              notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className={`p-3 border-b border-[var(--color-border-subtle)] text-sm transition-colors ${n.read ? "text-[var(--color-text-muted)]" : "text-[var(--color-text-primary)] bg-[rgba(255,255,255,0.02)]"}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                        n.type === "success" ? "bg-[var(--color-success)]" : n.type === "error" ? "bg-[var(--color-error)]" : "bg-[var(--color-info)]"
+                      }`}
+                    />
+                    <div>
+                      <p>{n.message}</p>
+                      <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                        {new Date(n.createdAt).toLocaleString("fr-FR")}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        </>
       )}
     </div>
   );
